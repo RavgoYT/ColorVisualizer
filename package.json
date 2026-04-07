@@ -1,0 +1,19 @@
+{
+  "name": "color-palette-visualizer",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^8.0.4"
+  },
+  "dependencies": {
+    "color-name-list": "^14.36.0",
+    "lz-string": "^1.5.0",
+    "nearest-color": "^0.4.4"
+  }
+}
