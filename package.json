@@ -9,11 +9,13 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.5",
     "vite": "^8.0.4"
   },
   "dependencies": {
     "color-name-list": "^14.36.0",
     "lz-string": "^1.5.0",
-    "nearest-color": "^0.4.4"
+    "nearest-color": "^0.4.4",
+    "vue": "^3.5.32"
   }
 }

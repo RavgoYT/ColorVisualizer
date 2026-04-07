@@ -7,6 +7,13 @@ import { initLocks, render, randomize, toggleDrawer, activateTab, toggleTheme,
 import { copyURL, toggleExport, doExport, exportVizCard as _exportVizCard } from './js/utils/export-utils.js';
 import { closeImgModal, handleBackdropClick, handleImageFile, extractColors, switchImgMode, clearImgSelected, initPickerCanvas, setRenderCallback } from './js/features/image-extractor.js';
 import { updatePageOG } from './js/social/og-integration.js';
+import { createApp } from 'vue'
+import App from './App.vue'
+import router from './router'
+
+const app = createApp(App)
+app.use(router)
+app.mount('#app')
 
 /* Expose to window (required for inline onclick= in HTML) */
 Object.assign(window, {

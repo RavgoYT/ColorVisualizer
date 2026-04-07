@@ -1,7 +1,7 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
-  // If deploying to https://username.github.io/repo-name/, set base to '/repo-name/'
-  // If using a custom domain (e.g. colors.ravgo.dev), set base to '/'
-    base: '/ColorVisualizer/',
-});
+  plugins: [vue()],
+  base: '/ColorVisualizer/' // important for GitHub Pages
+})
