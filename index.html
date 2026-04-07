@@ -73,9 +73,14 @@
       body.ready .palette-name-input { visibility: visible; }
       body.ready .swatch-name-input { visibility: visible; }
     </style>
+<script>
+      /* Restore path redirected from 404.html */
+      const p = new URLSearchParams(window.location.search).get('p');
+      if (p) history.replaceState(null, '', p);
+    </script>
     <script>
       /* Prevent theme flash by applying saved theme immediately */
-      if(localStorage.getItem('theme')==='light') document.documentElement.classList.add('light');
+      if(localStorage.getItem('theme')==='light') document.documentElement.classList.add('light');        
     </script>
   </head>
   <body>
