@@ -1,19 +1,12 @@
+// main.js
 import './styles.css';
 import { loadFromURL } from './js/core/url-manager.js';
 import { initLocks, render, randomize, toggleDrawer, activateTab, toggleTheme,
          updatePaletteName, updateSwatchName, removeColor, addColor,
-         toggleLock, openEditor, setEditorTabUI, applyEdit,
-         liveHex, liveRgb, liveHsl, e_stop } from './js/ui/ui-render.js';
+         toggleLock, openEditor, setEditorTabUI, applyEdit, liveHex, liveRgb, liveHsl, e_stop } from './js/ui/ui-render.js';
 import { copyURL, toggleExport, doExport, exportVizCard as _exportVizCard } from './js/utils/export-utils.js';
 import { closeImgModal, handleBackdropClick, handleImageFile, extractColors, switchImgMode, clearImgSelected, initPickerCanvas, setRenderCallback } from './js/features/image-extractor.js';
 import { updatePageOG } from './js/social/og-integration.js';
-import { createApp } from 'vue'
-import App from './App.vue'
-import router from './router'
-
-const app = createApp(App)
-app.use(router)
-app.mount('#app')
 
 /* Expose to window (required for inline onclick= in HTML) */
 Object.assign(window, {
@@ -27,7 +20,7 @@ Object.assign(window, {
   closeImgModal, handleBackdropClick, handleImageFile, extractColors, switchImgMode, clearImgSelected,
 });
 
-/* global event listenerss  */
+/* global event listeners */
 document.addEventListener('keydown', e => {
   if(e.code==='Space' && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)){
     e.preventDefault(); randomize();
@@ -56,7 +49,7 @@ if(dropZone){
   dropZone.addEventListener('drop', e=>{ e.preventDefault(); dropZone.classList.remove('dragover'); handleImageFile(e.dataTransfer.files[0]); });
 }
 
-/* boot*/
+/* boot */
 // Wrap render to also update OG tags
 const renderWithOG = async () => {
   render();

@@ -3,87 +3,82 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ColorVisualizer</title>
+    <title>Color Palette Generator</title>
+    <!-- Open Graph Meta Tags (updated dynamically by JavaScript) -->
+    <meta property="og:title" content="Color Palette Visualizer">
+    <meta property="og:description" content="Create and share beautiful color palettes.">
+    <meta property="og:url" content="https://color.ravgo.dev">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://color.ravgo.dev/og-preview.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:site_name" content="Color Palette Visualizer">
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Color Palette Visualizer">
+    <meta name="twitter:description" content="Create and share beautiful color palettes.">
+    <meta name="twitter:image" content="https://color.ravgo.dev/og-preview.png">
+    <!-- Other Meta -->
+    <meta name="theme-color" content="#a855f7">
+    <link rel="canonical" href="https://color.ravgo.dev">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+      /* Critical styles to prevent flash of unstyled content */
+      :root {
+        --bg:#06060a; --card:#0e0e16; --drawer:#0b0b14;
+        --border:rgba(255,255,255,0.06); --border2:rgba(255,255,255,0.11);
+        --text:rgba(255,255,255,0.85); --text-dim:rgba(255,255,255,0.35);
+        --text-faint:rgba(255,255,255,0.18); --text-label:rgba(255,255,255,0.22);
+        --hover:rgba(255,255,255,0.045); --active:rgba(255,255,255,0.08);
+        --accent:#a855f7;
+        --accent-dim:rgba(168,85,247,0.12);
+        --shadow:rgba(0,0,0,0.4); --mono:'JetBrains Mono','Fira Code',monospace;
+      }
+      :root.light {
+        --bg:#f0f0f5;
+        --card:#ffffff;
+        --drawer:#f8f9fc;
+        --border:rgba(0,0,0,0.06); --border2:rgba(0,0,0,0.12);
+        --text:rgba(15,15,30,0.85); --text-dim:rgba(15,15,30,0.5);
+        --text-faint:rgba(15,15,30,0.3); --text-label:rgba(15,15,30,0.4);
+        --hover:rgba(0,0,0,0.035); --active:rgba(0,0,0,0.07);
+        --accent:#8b2be2;
+        --accent-dim:rgba(139,43,226,0.1);
+        --shadow:rgba(0,0,0,0.12);
+      }
+      *, *::before, *::after { 
+        box-sizing: border-box; margin: 0; padding: 0; 
+      }
+      html { background: var(--bg); }
+      body { 
+        background: var(--bg); 
+        font-family: var(--mono); 
+        transition: background 0.3s;
+        margin: 0;
+        visibility: hidden; /* Hide until CSS loads */
+      }
+      body.ready { 
+        visibility: visible; /* Show when CSS is ready */
+      }
+      /* Hide elements that should be hidden initially */
+      .settings-drawer { width: 0; overflow: hidden; }
+      .modal-backdrop { display: none; }
+      .drop-line { display: none; }
+      .export-popup { display: none; }
+      .editor-popup { display: none; }
+      .theme-toggle { visibility: hidden; }
+      .palette-name-input { visibility: hidden; }
+      .swatch-name-input { visibility: hidden; }
+      body.ready .theme-toggle { visibility: visible; }
+      body.ready .palette-name-input { visibility: visible; }
+      body.ready .swatch-name-input { visibility: visible; }
+    </style>
+    <script>
+      /* Prevent theme flash by applying saved theme immediately */
+      if(localStorage.getItem('theme')==='light') document.documentElement.classList.add('light');
+    </script>
   </head>
   <body>
-    <div id="app"></div>
-  </body>
-</html>
-<title>Color Palette Generator</title>
-<!-- Open Graph Meta Tags (updated dynamically by JavaScript) -->
-<meta property="og:title" content="Color Palette Visualizer">
-<meta property="og:description" content="Create and share beautiful color palettes.">
-<meta property="og:url" content="https://color.ravgo.dev">
-<meta property="og:type" content="website">
-<meta property="og:image" content="https://color.ravgo.dev/og-preview.png">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:site_name" content="Color Palette Visualizer">
-<!-- Twitter Card -->
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Color Palette Visualizer">
-<meta name="twitter:description" content="Create and share beautiful color palettes.">
-<meta name="twitter:image" content="https://color.ravgo.dev/og-preview.png">
-<!-- Other Meta -->
-<meta name="theme-color" content="#a855f7">
-<link rel="canonical" href="https://color.ravgo.dev">
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
-<style>
-  /* Critical styles to prevent flash of unstyled content */
-  :root {
-    --bg:#06060a; --card:#0e0e16; --drawer:#0b0b14;
-    --border:rgba(255,255,255,0.06); --border2:rgba(255,255,255,0.11);
-    --text:rgba(255,255,255,0.85); --text-dim:rgba(255,255,255,0.35);
-    --text-faint:rgba(255,255,255,0.18); --text-label:rgba(255,255,255,0.22);
-    --hover:rgba(255,255,255,0.045); --active:rgba(255,255,255,0.08);
-    --accent:#a855f7;
-    --accent-dim:rgba(168,85,247,0.12);
-    --shadow:rgba(0,0,0,0.4); --mono:'JetBrains Mono','Fira Code',monospace;
-  }
-  :root.light {
-    --bg:#f0f0f5;
-    --card:#ffffff;
-    --drawer:#f8f9fc;
-    --border:rgba(0,0,0,0.06); --border2:rgba(0,0,0,0.12);
-    --text:rgba(15,15,30,0.85); --text-dim:rgba(15,15,30,0.5);
-    --text-faint:rgba(15,15,30,0.3); --text-label:rgba(15,15,30,0.4);
-    --hover:rgba(0,0,0,0.035); --active:rgba(0,0,0,0.07);
-    --accent:#8b2be2;
-    --accent-dim:rgba(139,43,226,0.1);
-    --shadow:rgba(0,0,0,0.12);
-  }
-  *, *::before, *::after { 
-    box-sizing: border-box; margin: 0; padding: 0; 
-  }
-  html { background: var(--bg); }
-  body { 
-    background: var(--bg); 
-    font-family: var(--mono); 
-    transition: background 0.3s;
-    margin: 0;
-    visibility: hidden; /* Hide until CSS loads */
-  }
-  body.ready { 
-    visibility: visible; /* Show when CSS is ready */
-  }
-  /* Hide elements that should be hidden initially */
-  .settings-drawer { width: 0; overflow: hidden; }
-  .modal-backdrop { display: none; }
-  .drop-line { display: none; }
-  .export-popup { display: none; }
-  .editor-popup { display: none; }
-  .theme-toggle { visibility: hidden; }
-  .palette-name-input { visibility: hidden; }
-  .swatch-name-input { visibility: hidden; }
-  body.ready .theme-toggle { visibility: visible; }
-  body.ready .palette-name-input { visibility: visible; }
-  body.ready .swatch-name-input { visibility: visible; }
-</style>
-<script>
-  /* Prevent theme flash by applying saved theme immediately */
-  if(localStorage.getItem('theme')==='light') document.documentElement.classList.add('light');
-</script>
-<body>
 
 <button class="theme-toggle" onclick="toggleTheme()" title="toggle light/dark">
   <div class="toggle-knob">
