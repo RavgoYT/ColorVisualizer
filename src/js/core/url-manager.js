@@ -1,3 +1,4 @@
+// url-manager.js
 import LZString from 'lz-string'; // mot currently used. considering removing
 import { PALETTES, current, setCurrent } from './state.js';
 import { hslToHex, updateDynamicAccent } from '../utils/color-utils.js';

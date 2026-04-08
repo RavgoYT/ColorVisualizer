@@ -1,3 +1,4 @@
+// image-extractor.js
 import { PALETTES, current, locks, setLocks } from '../core/state.js';
 import { rgbToHex } from '../utils/color-utils.js';
 import { updateURL } from '../core/url-manager.js';
