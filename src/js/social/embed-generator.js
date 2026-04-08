@@ -54,12 +54,103 @@ function packHexes(colors) {
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+function decodeMeta(str) {
+  try {
+    const b64 = str.replace(/-/g, '+').replace(/_/g, '/');
+    const decoded = atob(b64);
+    return decoded.split('|').map(n => n === '_' ? null : n);
+  } catch {
+    return [];
+  }
+}
+
+function isValidHex(str) {
+  return /^[0-9A-Fa-f]{6}$/.test(str);
+}
+
+function unpackHexes(str) {
+  const b64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  const binary = atob(b64);
+  const colors = [];
+  for (let i = 0; i < binary.length; i += 3) {
+    const n = (binary.charCodeAt(i) << 16) |
+              (binary.charCodeAt(i + 1) << 8) |
+               binary.charCodeAt(i + 2);
+    colors.push('#' + n.toString(16).padStart(6, '0'));
+  }
+  return colors;
+}
+
+const VIZ_TYPES = ['geo', 'typo', 'layers', 'gradient'];
+const VIZ_MAP = { geo: 'geo', typo: 'type', layers: 'depth', gradient: 'flow' };
+
+function parseOGPath(pathname) {
+  const parts = pathname.replace(/^\/+/g, '').split('/').filter(Boolean);
+  if (!parts.length) return null;
+
+  let vizType = 'palette';
+  if (VIZ_TYPES.includes(parts[parts.length - 1])) {
+    vizType = VIZ_MAP[parts.pop()];
+  }
+
+  let slug = '';
+  let hexPart = '';
+  if (parts.length === 1) {
+    hexPart = parts[0];
+  } else if (parts.length >= 2) {
+    slug = parts[0];
+    hexPart = parts[1];
+  } else {
+    return null;
+  }
+
+  let metaPart = null;
+  if (hexPart.includes('~')) {
+    [hexPart, metaPart] = hexPart.split('~');
+  }
+
+  let isLight = false;
+  if (hexPart.endsWith('L')) {
+    isLight = true;
+    hexPart = hexPart.slice(0, -1);
+  } else if (hexPart.endsWith('B')) {
+    isLight = false;
+    hexPart = hexPart.slice(0, -1);
+  }
+
+  let colors;
+  const rawHexes = hexPart.split('-').filter(Boolean);
+  if (rawHexes.every(isValidHex)) {
+    colors = rawHexes.map(h => '#' + h);
+  } else {
+    try {
+      colors = unpackHexes(hexPart);
+    } catch {
+      return null;
+    }
+    if (!colors.length || !colors.every(c => isValidHex(c.slice(1)))) return null;
+  }
+
+  const names = metaPart ? decodeMeta(metaPart) : colors.map(() => null);
+  return {
+    colors,
+    names,
+    slug: slug.replace(/-/g, ' ') || 'untitled',
+    isLight,
+    vizType,
+  };
+}
+
 function buildOGUrl(palette, vizType) {
   // Title card — no palette needed
   if (!palette || vizType === 'titlecard') return OG_BASE + '/';
 
-  const isLight = document.documentElement.classList.contains('light');
-  const theme = isLight ? 'L' : 'B';
+  const theme = palette.theme === 'L' ? 'L'
+    : palette.theme === 'B' ? 'B'
+    : palette.isLight === true ? 'L'
+    : palette.isLight === false ? 'B'
+    : (typeof document !== 'undefined' && document.documentElement.classList.contains('light') ? 'L' : 'B');
+
   const hexes = packHexes(palette.colors);
   const slug = (palette.name || '').toLowerCase().trim()
     .replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-');
