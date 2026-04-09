@@ -10,6 +10,8 @@ export function setMobileRenderCallback(fn) { _render = fn; }
 
 /* ── single-add guard: prevents double-fires across re-renders ───────────── */
 let _addCooldown = false;
+/* ── drag-active flag: suppresses pull-to-add during reorder drags ───────── */
+let _isDragging = false;
 
 /* ── query ───────────────────────────────────────────────────────────────── */
 export function isMobile() {
@@ -71,7 +73,8 @@ function injectActionBar() {
   });
 
   // Export button → open the export popup (which is already a full bottom sheet on mobile)
-  document.getElementById('mob-export').addEventListener('click', () => {
+  document.getElementById('mob-export').addEventListener('click', (e) => {
+    e.stopPropagation();
     if (typeof window.toggleExport === 'function') window.toggleExport();
     injectCopyLinkIntoExportPopup();
   });
@@ -219,11 +222,13 @@ function addSwipeDismiss(el, closeCallback, handleSelector) {
 }
 
 function initBottomSheetSwipeDismiss() {
-  // Called after injectBottomSheet — observer waits for the element
   const tryAttach = () => {
     const sheet = document.getElementById('mobile-bottom-sheet');
     if (sheet) {
       addSwipeDismiss(sheet, closeSheet, '.mobile-sheet-handle');
+      // Also allow dragging from the title row area
+      const title = sheet.querySelector('.mobile-sheet-title');
+      if (title) addSwipeDismiss(sheet, closeSheet, '.mobile-sheet-title');
     } else {
       requestAnimationFrame(tryAttach);
     }
@@ -562,9 +567,9 @@ export function renderMobileSwatches() {
           </svg>
         </div>
 
-        <div class="mobile-swatch-info">
+<div class="mobile-swatch-info">
           <div class="mobile-hex" style="color:${tc}">${realHex.toUpperCase()}</div>
-          <div class="mobile-name" style="color:${tc}">${name}</div>
+          <input class="mobile-name-input" data-action="rename" style="color:${tc};opacity:0.55;" value="${name}" placeholder="name…" />
         </div>
 
         <div class="mobile-swatch-icons">
@@ -606,6 +611,18 @@ export function renderMobileSwatches() {
       locks[i] = !locks[i];
       setLocks([...locks]);
       _render();
+    });
+
+    row.querySelector('[data-action="rename"]').addEventListener('click', e => {
+      e.stopPropagation();
+    });
+    row.querySelector('[data-action="rename"]').addEventListener('change', function(e) {
+      e.stopPropagation();
+      const p = PALETTES[current];
+      if (!p.names) p.names = [];
+      p.names[i] = this.value;
+      if (typeof window.updateSwatchName === 'function') window.updateSwatchName(i, this.value);
+      updateURL();
     });
 
     initTouchDrag(row.querySelector('.mobile-drag-handle'), i, container);
@@ -726,6 +743,21 @@ function applySwipePosition(content, bg, dx, threshold, isLocked) {
 }
 
 function triggerDeleteAnimation(row, idx, content, bg) {
+  const p = PALETTES[current];
+  if (p.colors.length <= 2) {
+    // Snap back with error shake
+    content.style.transition = 'transform 0.38s cubic-bezier(0.34,1.56,0.64,1)';
+    bg.style.transition = 'opacity 0.38s ease, width 0.38s ease';
+    content.style.transform = 'translateX(0)';
+    bg.style.opacity = '0';
+    bg.style.width = '0';
+    setTimeout(() => {
+      content.style.transition = '';
+      bg.style.transition = '';
+    }, 400);
+    showMobileToast('need at least 2 colors');
+    return;
+  }
   const rowHeight = row.getBoundingClientRect().height;
 
   content.style.transition = 'transform 0.2s cubic-bezier(0.4,0,0.8,0.6)';
@@ -801,8 +833,8 @@ function initPullToAdd(container) {
   let isAnimating = false;
   let gestureStartedAtBottom = false;
 
-  container.addEventListener('touchstart', e => {
-    if (isAnimating) return;
+container.addEventListener('touchstart', e => {
+    if (isAnimating || _isDragging) return;
     gestureStartedAtBottom = false;
     pullDelta = 0;
     triggered = false;
@@ -816,8 +848,8 @@ function initPullToAdd(container) {
     pullStartY = e.touches[0].clientY;
   }, { passive: true });
 
-  container.addEventListener('touchmove', e => {
-    if (isAnimating || !gestureStartedAtBottom) return;
+    container.addEventListener('touchmove', e => {
+    if (isAnimating || !gestureStartedAtBottom || _isDragging) return;
 
     const rawDy = pullStartY - e.touches[0].clientY;
     if (rawDy <= 0) return;
@@ -949,12 +981,13 @@ function startDragBehavior(triggerEl, srcIndex, container, isLongPress) {
   let rows = [];
   let dragging = false;
 
-  const onStart = e => {
+const onStart = e => {
     e.preventDefault(); // prevent scroll while using the handle
     targetIndex = srcIndex;
     rows = Array.from(container.querySelectorAll('.swatch'));
     rows[srcIndex]?.classList.add('mobile-dragging');
     dragging = true;
+    _isDragging = true;
   };
 
   const onMove = e => {
@@ -972,9 +1005,10 @@ function startDragBehavior(triggerEl, srcIndex, container, isLongPress) {
     });
   };
 
-  const onEnd = e => {
+const onEnd = e => {
     if (!dragging) return;
     dragging = false;
+    _isDragging = false;
     e.preventDefault();
     rows.forEach(r => r.classList.remove('mobile-dragging','mobile-drag-over-above','mobile-drag-over-below'));
     if (targetIndex !== srcIndex) {
@@ -1031,6 +1065,7 @@ function initLongPressDrag(row, srcIndex, container) {
       };
       const onEnd = ev => {
         ev.preventDefault();
+        _isDragging = false;
         row.classList.remove('mobile-long-press-lift', 'mobile-dragging');
         rows.forEach(r => r.classList.remove('mobile-drag-over-above', 'mobile-drag-over-below'));
         document.removeEventListener('touchmove', onMove, { passive: false });
@@ -1053,6 +1088,7 @@ function initLongPressDrag(row, srcIndex, container) {
         }
       };
       row.classList.add('mobile-dragging');
+      _isDragging = true;
       document.addEventListener('touchmove', onMove, { passive: false });
       document.addEventListener('touchend', onEnd, { passive: false });
     }, 420);
