@@ -16,9 +16,6 @@ async function handleRequest(request) {
     const url = new URL(request.url);
     const pathname = url.pathname;
 
-
-    console.log('html-og worker hit:', pathname);
-
     if (isHtmlRequest(request)) {
       return await handleHtmlRequest(request, pathname, url.search);
     }
@@ -43,58 +40,29 @@ function isHtmlRequest(request) {
 async function handleHtmlRequest(request, pathname, search) {
   const upstreamUrl = new URL('/' + search, UPSTREAM_HTML_ORIGIN).toString();
   const upstreamResponse = await fetch(upstreamUrl, request);
-  if (!upstreamResponse.ok) return upstreamResponse;
-
-  const html = await upstreamResponse.text();
-
-  // Handle root — inject title card meta
-  let injectedMeta;
-  if (pathname === '/' || pathname === '') {
-    injectedMeta = buildRootOGMeta();
-  } else {
-    injectedMeta = buildOGMetaHtmlFromPath(pathname);
+  if (!upstreamResponse.ok) {
+    return upstreamResponse;
   }
 
+  const html = await upstreamResponse.text();
+  const injectedMeta = buildOGMetaHtmlFromPath(pathname);
+  
+  // Fail open: if no valid OG meta, serve plain HTML
   if (!injectedMeta) {
     return new Response(html, {
       status: upstreamResponse.status,
+      statusText: upstreamResponse.statusText,
       headers: filterHtmlHeaders(upstreamResponse.headers),
     });
   }
 
   const body = html.replace('<!-- OG_META_TAGS -->', injectedMeta);
+
   return new Response(body, {
     status: upstreamResponse.status,
+    statusText: upstreamResponse.statusText,
     headers: filterHtmlHeaders(upstreamResponse.headers),
   });
-}
-
-function buildRootOGMeta() {
-  const title = 'Color Palette Visualizer';
-  const desc = 'Create, explore, and share beautiful color palettes.';
-  const ogImageUrl = `${OG_BASE}/`; // hits your title card handler
-
-  const meta = [
-    { property: 'og:title', content: title },
-    { property: 'og:description', content: desc },
-    { property: 'og:url', content: APP_ORIGIN },
-    { property: 'og:type', content: 'website' },
-    { property: 'og:image', content: ogImageUrl },
-    { property: 'og:image:width', content: '1200' },
-    { property: 'og:image:height', content: '630' },
-    { property: 'og:site_name', content: 'Color Palette Visualizer' },
-    { name: 'twitter:card', content: 'summary_large_image' },
-    { name: 'twitter:title', content: title },
-    { name: 'twitter:description', content: desc },
-    { name: 'twitter:image', content: ogImageUrl },
-  ];
-
-  return meta.map(entry => {
-    const attr = Object.entries(entry)
-      .map(([k, v]) => `${k}="${String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;')}"`)
-      .join(' ');
-    return `<meta ${attr}>`;
-  }).join('\n  ');
 }
 
 function fetchFromOrigin(request, path) {
@@ -138,6 +106,24 @@ function decodeMeta(str) {
   } catch {
     return [];
   }
+}
+
+// Human-readable viz type labels
+const VIZ_LABELS = { geo: 'Geometry', type: 'Typography', depth: 'Depth & Layers', flow: 'Gradient Flow' };
+
+// Title card accent colors — picked from the spheres used in buildTitleCard() in image-og-worker.js
+const TITLE_CARD_COLORS = ['#a855f7', '#ec4899', '#06b6d4'];
+
+function luminance(hex) {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const lin = c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+function highestLuminanceColor(colors) {
+  return colors.reduce((best, c) => luminance(c) > luminance(best) ? c : best, colors[0]);
 }
 
 function parseOGUrl(pathname) {
@@ -197,31 +183,20 @@ function parseOGUrl(pathname) {
   };
 }
 
-function buildOGMetaHtmlFromPath(pathname) {
-  const parsed = parseOGUrl(pathname);
-  if (!parsed) {
-    return null; // Fail open: don't inject OG meta for invalid URLs
-  }
-  
-  const title = `${parsed.slug} — Color Palette Visualizer`;
-  const fullUrl = `${APP_ORIGIN.replace(/\/+$/, '')}${pathname}`;
-  const ogImageUrl = `${OG_BASE.replace(/\/+$/, '')}${pathname === '/' ? '/' : pathname}`;
-  const imageWidth = '1200';
-  const imageHeight = '630';
-
+function buildMetaTags(title, description, fullUrl, ogImageUrl, imageWidth, imageHeight, themeColor) {
   const meta = [
-    { property: 'og:title', content: title },
-    { property: 'og:description', content: 'Create, explore, and share beautiful color palettes.' },
-    { property: 'og:url', content: fullUrl },
-    { property: 'og:type', content: 'website' },
-    { property: 'og:image', content: ogImageUrl },
-    { property: 'og:image:width', content: imageWidth },
+    { property: 'og:title',        content: title },
+    { property: 'og:description',  content: description },
+    { property: 'og:url',          content: fullUrl },
+    { property: 'og:type',         content: 'website' },
+    { property: 'og:image',        content: ogImageUrl },
+    { property: 'og:image:width',  content: imageWidth },
     { property: 'og:image:height', content: imageHeight },
-    { property: 'og:site_name', content: 'Color Palette Visualizer' },
-    { name: 'twitter:card', content: 'summary_large_image' },
-    { name: 'twitter:title', content: title },
-    { name: 'twitter:description', content: 'Create, explore, and share beautiful color palettes.' },
-    { name: 'twitter:image', content: ogImageUrl },
+    { name: 'twitter:card',        content: 'summary_large_image' },
+    { name: 'twitter:title',       content: title },
+    { name: 'twitter:description', content: description },
+    { name: 'twitter:image',       content: ogImageUrl },
+    { name: 'theme-color',         content: themeColor },
   ];
 
   return meta.map(entry => {
@@ -230,4 +205,48 @@ function buildOGMetaHtmlFromPath(pathname) {
       .join(' ');
     return `<meta ${attr}>`;
   }).join('\n  ');
+}
+
+function buildRootOGMeta() {
+  const themeColor = highestLuminanceColor(TITLE_CARD_COLORS);
+  return buildMetaTags(
+    'Color Palette Visualizer',
+    'Create, visualize, and share beautiful color palettes.',
+    APP_ORIGIN,
+    `${OG_BASE}/`,
+    '1200',
+    '630',
+    themeColor
+  );
+}
+
+function buildOGMetaHtmlFromPath(pathname) {
+  if (pathname === '/' || pathname === '') return buildRootOGMeta();
+
+  const parsed = parseOGUrl(pathname);
+  if (!parsed) return null; // Fail open: don't inject OG meta for invalid URLs
+
+  const paletteName = parsed.slug.charAt(0).toUpperCase() + parsed.slug.slice(1);
+  const vizLabel = VIZ_LABELS[parsed.vizType];
+  const title = vizLabel
+    ? `${paletteName} — ${vizLabel}`
+    : `${paletteName} — Palette`;
+
+  const isSquareViz = parsed.vizType !== 'palette';
+  const imageWidth  = isSquareViz ? '630' : '1200';
+  const imageHeight = '630';
+
+  const fullUrl    = `${APP_ORIGIN.replace(/\/+$/, '')}${pathname}`;
+  const ogImageUrl = `${OG_BASE.replace(/\/+$/, '')}${pathname}`;
+  const themeColor = highestLuminanceColor(parsed.colors);
+
+  return buildMetaTags(
+    title,
+    'Create, visualize, and share beautiful color palettes.',
+    fullUrl,
+    ogImageUrl,
+    imageWidth,
+    imageHeight,
+    themeColor
+  );
 }
