@@ -3,16 +3,17 @@ import './styles.css';
 import { loadFromURL } from './js/core/url-manager.js';
 import { initLocks, render, randomize, toggleDrawer, activateTab, toggleTheme,
          updatePaletteName, updateSwatchName, removeColor, addColor,
-         toggleLock, openEditor, setEditorTabUI, applyEdit, liveHex, liveRgb, liveHsl, e_stop } from './js/ui/ui-render.js';
+         toggleLock, openEditor, openEditorAt, setEditorTabUI, applyEdit, liveHex, liveRgb, liveHsl, e_stop } from './js/ui/ui-render.js';
 import { copyURL, toggleExport, doExport, exportVizCard as _exportVizCard } from './js/utils/export-utils.js';
 import { closeImgModal, handleBackdropClick, handleImageFile, extractColors, switchImgMode, clearImgSelected, initPickerCanvas, setRenderCallback } from './js/features/image-extractor.js';
 import { updatePageOG } from './js/social/og-integration.js';
+import { initMobile, setMobileRenderCallback, isMobile } from './js/ui/mobile.js';
 
 /* Expose to window (required for inline onclick= in HTML) */
 Object.assign(window, {
   randomize, toggleDrawer, activateTab, toggleTheme,
   updatePaletteName, updateSwatchName, removeColor, addColor,
-  toggleLock, openEditor,
+  toggleLock, openEditor, openEditorAt,
   setEditorTab: setEditorTabUI,  // HTML calls setEditorTab()
   applyEdit, liveHex, liveRgb, liveHsl, e_stop,
   exportVizCard: _exportVizCard,
@@ -59,9 +60,11 @@ const renderWithOG = async () => {
 };
 
 setRenderCallback(renderWithOG);
+setMobileRenderCallback(renderWithOG);
 loadFromURL();
 initLocks();
 initPickerCanvas();
+initMobile();          // inject action bar + bottom sheet DOM
 renderWithOG();
 
 /* ── Show page once CSS is loaded, not before */

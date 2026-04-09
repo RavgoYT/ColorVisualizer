@@ -17,6 +17,7 @@ import { hexToRgb, rgbToHex, hexToHsl, hslToHex, textColor, hslStr, contrast, lu
 let dragGhost = null;
 import { updateURL } from '../core/url-manager.js';
 import { getColorName } from '../utils/color-namer.js';
+import { isMobile, renderMobileSwatches, syncSheetInfo } from './mobile.js';
 
 /* ── RENDER ──────────────────────────────────────────────────────────────── */
 
@@ -38,6 +39,16 @@ export function render() {
   const p=PALETTES[current];
   document.getElementById('palette-name-input').value=p.name;
   document.querySelector('.title-prefix').textContent=cvdIndex?`palette (${CVD_MODES[cvdIndex]}) —`:`palette —`;
+
+  if (isMobile()) {
+    renderMobileSwatches();
+    selectColor(selected); // updates info cards (sel-hex, sel-hsl, sel-contrast)
+    updateURL();
+    syncSheetInfo();
+    // always render viz content so it's ready when user switches to it
+    renderViz();
+    return;
+  }
 
   const sw=document.getElementById('swatches');
   const dropLine=document.getElementById('drop-line');
