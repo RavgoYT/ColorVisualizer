@@ -427,7 +427,13 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
     padding: 0;
     align-items: flex-start;
     min-height: 100dvh;
+    height: 100dvh;
+    height: 100vh;
+    max-height: 100dvh;
+    max-height: 100vh;
     overflow: hidden;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
   }
 
   /* .outer is the true root of the app on mobile.
@@ -441,6 +447,8 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
     width: 100%;
     height: 100dvh;
     height: 100vh;
+    max-height: 100dvh;
+    max-height: 100vh;
     overflow: hidden;
     background: var(--card);
   }
@@ -471,12 +479,16 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
   ────────────────────────────────────────────────────────────── */
   .top-bar {
     flex-shrink: 0;
-    height: 52px;
-    padding: 0 18px;
+    /* height grows to absorb the safe-area-inset-top (Dynamic Island / notch).
+       The visible title area is always 52px; content is pushed down by the inset. */
+    height: calc(52px + env(safe-area-inset-top, 0px));
+    padding: env(safe-area-inset-top, 0px) 18px 0;
     margin-bottom: 0;
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     justify-content: center;
+    padding-bottom: 0;
+    /* Match .outer background so the area behind Dynamic Island is identical */
     background: var(--card);
     border-bottom: .5px solid var(--border);
     border-radius: 0 0 14px 14px;
@@ -553,7 +565,7 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
     /* height:0 + flex:1 = take all available space, no more */
     height: 0 !important;
     min-height: 0 !important;
-    max-height: none !important;
+    max-height: calc(100dvh - 52px - env(safe-area-inset-top, 0px) - calc(64px + env(safe-area-inset-bottom, 0px))) !important;
     gap: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -566,8 +578,8 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
 
   /* Each swatch stretches to fill. 1/10 floor ensures >10 swatches scroll. */
   .swatch {
-    flex: 1 1 calc((100dvh - 52px - 64px) / 10) !important;
-    min-height: calc((100dvh - 52px - 64px) / 10) !important;
+    flex: 1 1 calc((100dvh - 52px - env(safe-area-inset-top, 0px) - 64px) / 10) !important;
+    min-height: calc((100dvh - 52px - env(safe-area-inset-top, 0px) - 64px) / 10) !important;
     max-height: none !important;
     height: auto !important;
     border-radius: 9px !important;
@@ -585,7 +597,7 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
   }
   /* Neutralise desktop hover expansion */
   .swatch:hover,
-  .swatch:active { flex: 1 1 calc((100dvh - 52px - 64px) / 10) !important; border-radius: 9px !important; }
+  .swatch:active { flex: 1 1 calc((100dvh - 52px - env(safe-area-inset-top, 0px) - 64px) / 10) !important; border-radius: 9px !important; }
 
   /* drag states */
   .swatch.mobile-dragging { opacity: 0.4; }
@@ -706,8 +718,8 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
   }
   .viz-card {
     min-height: unset;
-    height: calc((100dvh - 52px - 64px - 12px - 10px - 24px) / 2);
-    max-height: calc((100dvh - 52px - 64px - 12px - 10px - 24px) / 2);
+    height: calc((100dvh - 52px - env(safe-area-inset-top, 0px) - 64px - env(safe-area-inset-bottom, 0px) - 12px - 10px - 24px) / 2);
+    max-height: calc((100dvh - 52px - env(safe-area-inset-top, 0px) - 64px - env(safe-area-inset-bottom, 0px) - 12px - 10px - 24px) / 2);
   }
   .viz-dl-btn { opacity: 1 !important; transform: none !important; }
   .viz-dl-btn.mob-viz-upload svg { stroke: var(--accent); }
@@ -774,12 +786,15 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
     bottom: 0;
     left: 0;
     right: 0;
-    height: 64px;
+    height: calc(64px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     background: var(--card);
     border-top: .5px solid var(--border);
     display: flex !important;
     align-items: center;
-    padding: 0 12px;
+    padding-top: 0;
+    padding-left: 12px;
+    padding-right: 12px;
     gap: 8px;
     z-index: 300;
     flex-shrink: 0;
