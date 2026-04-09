@@ -33,13 +33,13 @@ function detectVizType() {
  * so the worker receives exactly the same string it would get from a real page URL.
  *
  * URL shapes:
- *   Title card:  https://og.colors.ravgo.dev/
- *   Palette:     https://og.colors.ravgo.dev/[slug/]<hexes><theme>
- *   Viz:         https://og.colors.ravgo.dev/[slug/]<hexes><theme>/<vizSlug>
+ *   Title card:  https://image-og.colors.ravgo.dev/
+ *   Palette:     https://image-og.colors.ravgo.dev/[slug/]<hexes><theme>
+ *   Viz:         https://image-og.colors.ravgo.dev/[slug/]<hexes><theme>/<vizSlug>
  *
  * vizSlug mapping (worker side): geo→geo, type→typo, depth→layers, flow→gradient
  */
-const OG_BASE = 'https://og.colors.ravgo.dev';
+const OG_BASE = 'https://image-og.colors.ravgo.dev';
 const VIZ_SLUG = { geo: 'geo', type: 'typo', depth: 'layers', flow: 'gradient' };
 
 function packHexes(colors) {
@@ -170,7 +170,7 @@ function buildOGUrl(palette, vizType) {
  *
  * Strategy:
  *   1. Build the OG worker URL for the current palette + viz type.
- *   2. Fetch the SVG from og.colors.ravgo.dev (returns image/svg+xml).
+ *   2. Fetch the SVG from image-og.colors.ravgo.dev (returns image/svg+xml).
  *   3. Rasterise it onto a canvas via an <img> element, then export as PNG.
  *
  * Falls back to the legacy canvas renderer if the fetch fails (e.g. offline /
@@ -429,7 +429,7 @@ export function generateOGMetaTags(slugUrl) {
     { property: 'og:image',        content: ogImageUrl },
     { property: 'og:image:width',  content: imgWidth },
     { property: 'og:image:height', content: imgHeight },
-    { property: 'og:site_name',    content: 'Color Palette Visualizer • colors.ravgo.dev' },
+    { property: 'og:site_name',    content: 'Color Palette Visualizer' },
     { name: 'twitter:card',        content: 'summary_large_image' },
     { name: 'twitter:title',       content: palette.name },
     { name: 'twitter:image',       content: ogImageUrl },

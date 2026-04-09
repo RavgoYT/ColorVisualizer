@@ -1,7 +1,7 @@
 // This code does nothing within this project. It is only here to be uploaded to the Cloudflare worker to run my Open Graph (OG) server.
 
 const APP_ORIGIN = 'https://colors.ravgo.dev';
-const UPSTREAM_HTML_ORIGIN = 'https://ravgoyt.github.io/ColorVisualizer/';
+const UPSTREAM_HTML_ORIGIN = 'https://colors.ravgo.dev';
 const OG_BASE = 'https://image-og.colors.ravgo.dev';
 
 const VIZ_TYPES = ['geo', 'typo', 'layers', 'gradient'];
@@ -15,6 +15,9 @@ async function handleRequest(request) {
   try {
     const url = new URL(request.url);
     const pathname = url.pathname;
+
+
+    console.log('html-og worker hit:', pathname);
 
     if (isHtmlRequest(request)) {
       return await handleHtmlRequest(request, pathname, url.search);
@@ -40,29 +43,58 @@ function isHtmlRequest(request) {
 async function handleHtmlRequest(request, pathname, search) {
   const upstreamUrl = new URL('/' + search, UPSTREAM_HTML_ORIGIN).toString();
   const upstreamResponse = await fetch(upstreamUrl, request);
-  if (!upstreamResponse.ok) {
-    return upstreamResponse;
-  }
+  if (!upstreamResponse.ok) return upstreamResponse;
 
   const html = await upstreamResponse.text();
-  const injectedMeta = buildOGMetaHtmlFromPath(pathname);
-  
-  // Fail open: if no valid OG meta, serve plain HTML
+
+  // Handle root — inject title card meta
+  let injectedMeta;
+  if (pathname === '/' || pathname === '') {
+    injectedMeta = buildRootOGMeta();
+  } else {
+    injectedMeta = buildOGMetaHtmlFromPath(pathname);
+  }
+
   if (!injectedMeta) {
     return new Response(html, {
       status: upstreamResponse.status,
-      statusText: upstreamResponse.statusText,
       headers: filterHtmlHeaders(upstreamResponse.headers),
     });
   }
 
   const body = html.replace('<!-- OG_META_TAGS -->', injectedMeta);
-
   return new Response(body, {
     status: upstreamResponse.status,
-    statusText: upstreamResponse.statusText,
     headers: filterHtmlHeaders(upstreamResponse.headers),
   });
+}
+
+function buildRootOGMeta() {
+  const title = 'Color Palette Visualizer';
+  const desc = 'Create, explore, and share beautiful color palettes.';
+  const ogImageUrl = `${OG_BASE}/`; // hits your title card handler
+
+  const meta = [
+    { property: 'og:title', content: title },
+    { property: 'og:description', content: desc },
+    { property: 'og:url', content: APP_ORIGIN },
+    { property: 'og:type', content: 'website' },
+    { property: 'og:image', content: ogImageUrl },
+    { property: 'og:image:width', content: '1200' },
+    { property: 'og:image:height', content: '630' },
+    { property: 'og:site_name', content: 'Color Palette Visualizer' },
+    { name: 'twitter:card', content: 'summary_large_image' },
+    { name: 'twitter:title', content: title },
+    { name: 'twitter:description', content: desc },
+    { name: 'twitter:image', content: ogImageUrl },
+  ];
+
+  return meta.map(entry => {
+    const attr = Object.entries(entry)
+      .map(([k, v]) => `${k}="${String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;')}"`)
+      .join(' ');
+    return `<meta ${attr}>`;
+  }).join('\n  ');
 }
 
 function fetchFromOrigin(request, path) {

@@ -1,7 +1,7 @@
 // This code does nothing within this project. It is only here to be uploaded to the Cloudflare worker to run my Open Graph (OG) server.
 
 const APP_ORIGIN = 'https://colors.ravgo.dev';
-const UPSTREAM_HTML_ORIGIN = 'https://ravgoyt.github.io/ColorVisualizer/';
+const UPSTREAM_HTML_ORIGIN = 'https://colors.ravgo.dev';
 const OG_BASE = 'https://image-og.colors.ravgo.dev';
 
 const VIZ_TYPES = ['geo', 'typo', 'layers', 'gradient'];
