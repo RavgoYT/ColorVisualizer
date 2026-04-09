@@ -219,6 +219,13 @@ export function randomize() {
     } while((used.has(hex)||c===hex)&&attempts<40);
     used.add(hex); return hex;
   });
+  // Update names for every unlocked slot — the color changed so any previous
+  // name (custom or not) no longer belongs to it. Locked slots keep their names.
+  if(!cur.names) cur.names=[];
+  cur.colors.forEach((hex, i) => {
+    if(locks[i]) return;
+    cur.names[i] = getColorName(hex) || 'color';
+  });
   render();
 }
 
@@ -271,7 +278,18 @@ export function liveHsl() {
   const h=parseInt(texts[0].value)||0, s=parseInt(texts[1].value)||0, l=parseInt(texts[2].value)||0;
   setEditorHex(hslToHex(h,s,l)); document.getElementById('editor-preview').style.background=editorHex;
 }
-export function applyEdit() { PALETTES[current].colors[editorIndex]=editorHex; document.getElementById('editor-popup').classList.remove('open'); updateURL(); render(); }
+export function applyEdit() {
+  const p=PALETTES[current];
+  const oldHex=p.colors[editorIndex];
+  p.colors[editorIndex]=editorHex;
+  // If the name was auto-generated (matches the old color's default name or is a placeholder),
+  // update it to match the new color. Custom names are preserved.
+  const oldDefault=getColorName(oldHex)||'color';
+  const currentName=(p.names&&p.names[editorIndex])||'';
+  const isCustom=currentName.toLowerCase()!==oldDefault.toLowerCase()&&!['color','new',''].includes(currentName.toLowerCase());
+  if(!isCustom){ if(!p.names) p.names=[]; p.names[editorIndex]=getColorName(editorHex)||'color'; }
+  document.getElementById('editor-popup').classList.remove('open'); updateURL(); render();
+}
 
 /* ── UI STATE ────────────────────────────────────────────────────────────── */
 export function toggleDrawer() {
