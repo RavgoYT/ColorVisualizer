@@ -30,6 +30,7 @@ export function initMobile() {
   initEditorPopupSwipeDismiss();
   initExportPopupSwipeDismiss();
   initVizActionMenus();
+  syncThemeLabel(); // sync theme-color meta on first load
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -186,10 +187,15 @@ function initVizActionMenus() {
    ═══════════════════════════════════════════════════════════════════════════ */
 function addSwipeDismiss(el, closeCallback, handleSelector) {
   if (!el) return;
-  const handle = el.querySelector(handleSelector || '.mobile-sheet-handle') || el;
+  // If a specific handle selector is given, use it; otherwise use the whole element.
+  // For the bottom sheet we want the entire sheet body to be draggable downward.
+  const handle = (handleSelector && el.querySelector(handleSelector)) || el;
   let startY = 0, isDragging = false;
 
   handle.addEventListener('touchstart', e => {
+    // Don't intercept taps on interactive children (inputs, buttons, tabs)
+    const tag = e.target.tagName;
+    if (tag === 'INPUT' || tag === 'BUTTON' || e.target.closest('[data-sheet-action]')) return;
     startY = e.touches[0].clientY;
     isDragging = true;
     el.style.transition = 'none';
@@ -209,7 +215,6 @@ function addSwipeDismiss(el, closeCallback, handleSelector) {
     const dy = e.changedTouches[0].clientY - startY;
     el.style.transition = '';
     if (dy > 80) {
-      // Snap down then close
       el.style.transform = 'translateY(100%)';
       setTimeout(() => {
         el.style.transform = '';
@@ -225,10 +230,9 @@ function initBottomSheetSwipeDismiss() {
   const tryAttach = () => {
     const sheet = document.getElementById('mobile-bottom-sheet');
     if (sheet) {
-      addSwipeDismiss(sheet, closeSheet, '.mobile-sheet-handle');
-      // Also allow dragging from the title row area
-      const title = sheet.querySelector('.mobile-sheet-title');
-      if (title) addSwipeDismiss(sheet, closeSheet, '.mobile-sheet-title');
+      // Pass no handleSelector — entire sheet body is the drag target,
+      // interactive children are excluded inside addSwipeDismiss.
+      addSwipeDismiss(sheet, closeSheet);
     } else {
       requestAnimationFrame(tryAttach);
     }
@@ -465,6 +469,9 @@ function syncThemeLabel() {
   const isLight = document.documentElement.classList.contains('light');
   const label = document.getElementById('mob-theme-label');
   const icon  = document.getElementById('mob-theme-icon');
+  // Keep browser chrome (status bar / Dynamic Island area) in sync with card bg
+  const meta = document.getElementById('theme-color-meta');
+  if (meta) meta.setAttribute('content', isLight ? '#ffffff' : '#06060a');
   if (label) label.textContent = isLight ? 'Light mode' : 'Dark mode';
   if (icon) {
     icon.innerHTML = isLight
@@ -823,9 +830,9 @@ function initPullToAdd(container) {
   const inner = zone.querySelector('.mob-pull-up-inner');
   const label = zone.querySelector('.mob-pull-up-label');
 
-  const TRIGGER_DISTANCE = 90;   // was 72 — needs more deliberate pull
-  const MAX_PULL        = 120;
-  const DEAD_ZONE       = 18;    // first 18px of upward drag is ignored entirely
+  const TRIGGER_DISTANCE = 110;   // was 72 — needs more deliberate pull
+  const MAX_PULL        = 130; // was 120
+  const DEAD_ZONE       = 28;    // first 28px (was 18) of upward drag is ignored entirely
   let pullStartY  = 0;
   let isPulling   = false;
   let pullDelta   = 0;

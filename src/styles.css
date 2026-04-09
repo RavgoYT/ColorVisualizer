@@ -426,6 +426,10 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
 body { touch-action: manipulation; overscroll-behavior-y: none; }
   html { overscroll-behavior-y: none; }
 
+/* ── disable double-tap zoom + pull-to-refresh ──────────────── */
+  body { touch-action: manipulation; overscroll-behavior-y: none; }
+  html { overscroll-behavior-y: none; }
+
   /* ── page shell ────────────────────────────────────────────── */
   .page {
     padding: 0;
@@ -441,6 +445,7 @@ body { touch-action: manipulation; overscroll-behavior-y: none; }
     height: 100dvh;
     height: 100vh;
     overflow: hidden;
+    background: var(--bg);
   }
 
   /* side drawer — replaced by bottom sheet */
@@ -454,16 +459,19 @@ body { touch-action: manipulation; overscroll-behavior-y: none; }
     flex: 1;
     display: flex;
     flex-direction: column;
+    /* wrap is EXACTLY the viewport height minus nothing — it does NOT scroll */
     height: 100%;
     overflow: hidden;
     min-height: 0;
+    background: var(--card);
   }
   .wrap.drawer-open { border-radius: 0 !important; }
 
   /* ── MOBILE TOP BAR ─────────────────────────────────────────
-     Sticky + rounded bottom corners to complement swatch rounding.
+     Fixed height, flex-shrink:0, NO position:sticky, NO overflow.
+     The bar never moves — swatches scroll independently below it.
   ────────────────────────────────────────────────────────────── */
-.top-bar {
+  .top-bar {
     padding: 0 18px;
     height: 52px;
     margin-bottom: 0;
@@ -476,7 +484,13 @@ body { touch-action: manipulation; overscroll-behavior-y: none; }
     border-radius: 0 0 14px 14px;
     position: relative;
     z-index: 10;
+    /* Prevent any touch scrolling gesture from moving the title bar */
+    touch-action: none;
+    pointer-events: auto;
   }
+  /* Absorb all touch events on the title bar so scrolling never bleeds through */
+  .top-bar * { touch-action: auto; }
+  .palette-name-input { touch-action: auto; }
   .title-prefix { display: none; }
   .actions { display: none; }
   .title-container {
@@ -531,8 +545,13 @@ body { touch-action: manipulation; overscroll-behavior-y: none; }
 .swatches {
     display: flex !important;
     flex-direction: column !important;
-    height: auto !important;
-    flex: 1 !important;
+    /* Container is exactly the space between topbar and actionbar.
+       Swatches flex-grow to fill it. Past 10, min-height takes over and it scrolls. */
+    height: calc(100dvh - 52px - 64px) !important;
+    min-height: calc(100dvh - 52px - 64px) !important;
+    max-height: calc(100dvh - 52px - 64px) !important;
+    flex: none !important;
+    align-content: stretch;
     gap: 0 !important;
     margin-bottom: 0 !important;
     position: relative;
@@ -540,15 +559,18 @@ body { touch-action: manipulation; overscroll-behavior-y: none; }
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: none;
-    padding: 0 0 0 0 !important;
+    padding: 0 !important;
   }
 
-  .swatch {
-    flex: 1 !important;
+.swatch {
+    /* Stretch to fill available space, but never smaller than 1/10 of the area.
+       ≤10 swatches: flex:1 fills the container evenly with no scroll.
+       >10 swatches: min-height kicks in, container scrolls. */
+    flex: 1 1 calc((100dvh - 52px - 64px) / 10) !important;
     border-radius: 9px !important;
     height: auto !important;
-    /* 1/10 of the space between topbar and actionbar — exact fit for 10 swatches */
-    min-height: calc((100dvh - 52px - 64px) / 10);
+    min-height: calc((100dvh - 52px - 64px) / 10) !important;
+    max-height: none !important;
     padding: 0 !important;
     display: flex !important;
     flex-direction: row !important;
