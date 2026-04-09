@@ -24,6 +24,10 @@ export function initMobile() {
   injectActionBar();
   injectBottomSheet();
   injectSheetBackdrop();
+  initBottomSheetSwipeDismiss();
+  initEditorPopupSwipeDismiss();
+  initExportPopupSwipeDismiss();
+  initVizActionMenus();
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -37,14 +41,11 @@ function injectActionBar() {
   bar.className = 'mobile-action-bar';
   bar.innerHTML = `
     <button class="mob-btn-generate" id="mob-generate">Generate</button>
-    <button class="mob-btn-icon" id="mob-share" title="Copy link">
-      <svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-    </button>
     <button class="mob-btn-icon" id="mob-viz" title="Visualize">
       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
     </button>
     <button class="mob-btn-icon" id="mob-export" title="Export">
-      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
     </button>
     <button class="mob-btn-icon" id="mob-menu" title="Menu">
       <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -56,17 +57,6 @@ function injectActionBar() {
     if (typeof window.randomize === 'function') window.randomize();
   });
 
-  document.getElementById('mob-share').addEventListener('click', () => {
-    const btn = document.getElementById('mob-share');
-    if (navigator.share) {
-      navigator.share({ url: location.href }).catch(() => {});
-    } else {
-      navigator.clipboard.writeText(location.href).catch(() => {});
-    }
-    btn.classList.add('active-view');
-    setTimeout(() => btn.classList.remove('active-view'), 1200);
-  });
-
   document.getElementById('mob-viz').addEventListener('click', () => {
     const editSection = document.getElementById('view-edit');
     const vizSection  = document.getElementById('view-viz');
@@ -76,59 +66,232 @@ function injectActionBar() {
     document.getElementById('mob-viz').classList.toggle('active-view', !isViz);
     if (!isViz) {
       document.dispatchEvent(new CustomEvent('mobile-render-viz'));
-      // On entering viz view, swap download buttons to share buttons
-      requestAnimationFrame(() => swapVizButtonsToShare());
+      requestAnimationFrame(() => setupVizButtons());
     }
   });
 
+  // Export button → open the export popup (which is already a full bottom sheet on mobile)
   document.getElementById('mob-export').addEventListener('click', () => {
     if (typeof window.toggleExport === 'function') window.toggleExport();
+    injectCopyLinkIntoExportPopup();
   });
 
   document.getElementById('mob-menu').addEventListener('click', openSheet);
 
-  // Also swap viz buttons whenever the viz view is rendered via the event
   document.addEventListener('mobile-render-viz', () => {
-    requestAnimationFrame(() => swapVizButtonsToShare());
+    requestAnimationFrame(() => setupVizButtons());
   });
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   VIZ SHARE BUTTONS  — replace download icon with share on mobile
+   VIZ BUTTONS  — upload icon that opens PNG / copy-link mini-menu
    ═══════════════════════════════════════════════════════════════════════════ */
-const VIZ_SHARE_PATHS = ['/geo', '/typo', '/layers', '/gradient'];
+const VIZ_TYPES = ['geo', 'type', 'depth', 'flow'];
 
-function swapVizButtonsToShare() {
+function setupVizButtons() {
   const btns = document.querySelectorAll('.viz-dl-btn');
   btns.forEach((btn, i) => {
-    if (btn.dataset.mobileShareWired) return; // don't double-wire
-    btn.dataset.mobileShareWired = '1';
-    btn.classList.add('mob-viz-share');
+    if (btn.dataset.mobileVizWired) return;
+    btn.dataset.mobileVizWired = '1';
+    btn.classList.add('mob-viz-upload');
 
-    // Swap icon to share/upload arrow
+    // Replace icon with upload/share arrow
     btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
       <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
       <polyline points="16 6 12 2 8 6"/>
       <line x1="12" y1="2" x2="12" y2="15"/>
     </svg>`;
 
-    // Replace onclick with share handler (remove inline onclick from HTML)
+    // Remove any existing inline onclick (desktop download handler)
     btn.removeAttribute('onclick');
+
+    // Build the mini-menu if not already there
+    const card = btn.closest('.viz-card');
+    if (!card) return;
+    let menu = card.querySelector('.viz-action-menu');
+    if (!menu) {
+      menu = document.createElement('div');
+      menu.className = 'viz-action-menu';
+      const type = VIZ_TYPES[i] || 'geo';
+      menu.innerHTML = `
+        <div class="viz-action-item" data-action="png">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Save PNG
+        </div>
+        <div class="viz-action-item" data-action="link">
+          <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          Copy Link
+        </div>
+      `;
+      card.appendChild(menu);
+
+      menu.querySelector('[data-action="png"]').addEventListener('click', e => {
+        e.stopPropagation();
+        menu.classList.remove('open');
+        btn.classList.remove('active-view');
+        // Try window.exportVizCard (if main.js exposes it) then fall back to _exportVizCard
+        const fn = window.exportVizCard || window._exportVizCard;
+        if (typeof fn === 'function') fn(type);
+      });
+
+      menu.querySelector('[data-action="link"]').addEventListener('click', e => {
+        e.stopPropagation();
+        menu.classList.remove('open');
+        btn.classList.remove('active-view');
+        const slugMap = { geo: '/geo', type: '/typo', depth: '/layers', flow: '/gradient' };
+        const base = location.origin + location.pathname.replace(/\/$/, '');
+        const shareURL = base + (slugMap[type] || '');
+        if (navigator.share) {
+          navigator.share({ url: shareURL }).catch(() => {
+            navigator.clipboard.writeText(shareURL).catch(() => {});
+          });
+        } else {
+          navigator.clipboard.writeText(shareURL).catch(() => {});
+          showMobileToast('link copied');
+        }
+      });
+    }
+
     btn.addEventListener('click', e => {
       e.stopPropagation();
-      const slug = VIZ_SHARE_PATHS[i] || '';
-      const base = location.origin + location.pathname.replace(/\/$/, '');
-      const shareURL = base + slug;
-      if (navigator.share) {
-        navigator.share({ url: shareURL }).catch(() => {
-          navigator.clipboard.writeText(shareURL).catch(() => {});
-        });
-      } else {
-        navigator.clipboard.writeText(shareURL).catch(() => {});
-        showMobileToast('link copied');
+      const isOpen = menu.classList.contains('open');
+      // Close all other open menus
+      document.querySelectorAll('.viz-action-menu.open').forEach(m => m.classList.remove('open'));
+      document.querySelectorAll('.viz-dl-btn.active-view').forEach(b => b.classList.remove('active-view'));
+      if (!isOpen) {
+        menu.classList.add('open');
+        btn.classList.add('active-view');
       }
     });
   });
+
+  // Tap elsewhere closes any open viz menu
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.viz-action-menu.open').forEach(m => m.classList.remove('open'));
+    document.querySelectorAll('.viz-dl-btn.active-view').forEach(b => b.classList.remove('active-view'));
+  }, { once: false, capture: true });
+}
+
+// Expose for external calls
+function initVizActionMenus() {
+  // Will be called after viz renders — no-op at boot, set up via event
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SWIPE-DOWN-TO-DISMISS  — bottom sheets & popups
+   Attach to any element with a drag-handle; a downward swipe closes it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+function addSwipeDismiss(el, closeCallback, handleSelector) {
+  if (!el) return;
+  const handle = el.querySelector(handleSelector || '.mobile-sheet-handle') || el;
+  let startY = 0, isDragging = false;
+
+  handle.addEventListener('touchstart', e => {
+    startY = e.touches[0].clientY;
+    isDragging = true;
+    el.style.transition = 'none';
+  }, { passive: true });
+
+  handle.addEventListener('touchmove', e => {
+    if (!isDragging) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy > 0) {
+      el.style.transform = `translateY(${dy}px)`;
+    }
+  }, { passive: true });
+
+  handle.addEventListener('touchend', e => {
+    if (!isDragging) return;
+    isDragging = false;
+    const dy = e.changedTouches[0].clientY - startY;
+    el.style.transition = '';
+    if (dy > 80) {
+      // Snap down then close
+      el.style.transform = 'translateY(100%)';
+      setTimeout(() => {
+        el.style.transform = '';
+        closeCallback();
+      }, 300);
+    } else {
+      el.style.transform = '';
+    }
+  }, { passive: true });
+}
+
+function initBottomSheetSwipeDismiss() {
+  // Called after injectBottomSheet — observer waits for the element
+  const tryAttach = () => {
+    const sheet = document.getElementById('mobile-bottom-sheet');
+    if (sheet) {
+      addSwipeDismiss(sheet, closeSheet, '.mobile-sheet-handle');
+    } else {
+      requestAnimationFrame(tryAttach);
+    }
+  };
+  tryAttach();
+}
+
+function initEditorPopupSwipeDismiss() {
+  // Editor popup handle is the ::before pseudo — we use a wide touch target at top
+  const tryAttach = () => {
+    const popup = document.getElementById('editor-popup');
+    if (popup) {
+      // Create an invisible drag handle div at the top of the popup
+      if (!popup.querySelector('.mob-popup-handle')) {
+        const handle = document.createElement('div');
+        handle.className = 'mob-popup-handle';
+        handle.style.cssText = 'position:absolute;top:0;left:0;right:0;height:32px;z-index:10;cursor:grab;';
+        popup.insertBefore(handle, popup.firstChild);
+      }
+      addSwipeDismiss(popup, () => {
+        popup.classList.remove('open');
+        const backdrop = popup.previousElementSibling;
+        if (backdrop && backdrop.classList.contains('editor-backdrop')) backdrop.classList.remove('open');
+      }, '.mob-popup-handle');
+    } else {
+      setTimeout(tryAttach, 500);
+    }
+  };
+  tryAttach();
+}
+
+function initExportPopupSwipeDismiss() {
+  const tryAttach = () => {
+    const popup = document.getElementById('export-popup');
+    if (popup) {
+      // Use the ::before pseudo-element area (top 28px) as visual handle.
+      // We do NOT inject a real DOM handle div — that intercepts taps on export options.
+      // Instead we listen for swipe-down starting in the top 36px of the popup.
+      let startY = 0, isDragging = false;
+      popup.addEventListener('touchstart', e => {
+        const rect = popup.getBoundingClientRect();
+        if (e.touches[0].clientY - rect.top > 36) return; // only handle-area
+        startY = e.touches[0].clientY;
+        isDragging = true;
+        popup.style.transition = 'none';
+      }, { passive: true });
+      popup.addEventListener('touchmove', e => {
+        if (!isDragging) return;
+        const dy = e.touches[0].clientY - startY;
+        if (dy > 0) popup.style.transform = `translateY(${dy}px)`;
+      }, { passive: true });
+      popup.addEventListener('touchend', e => {
+        if (!isDragging) return;
+        isDragging = false;
+        const dy = e.changedTouches[0].clientY - startY;
+        popup.style.transition = '';
+        if (dy > 80) {
+          popup.style.transform = 'translateY(100%)';
+          setTimeout(() => { popup.style.transform = ''; popup.classList.remove('open'); }, 300);
+        } else {
+          popup.style.transform = '';
+        }
+      }, { passive: true });
+    } else {
+      setTimeout(tryAttach, 500);
+    }
+  };
+  tryAttach();
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -186,6 +349,12 @@ function injectBottomSheet() {
         <div class="drawer-tab-text"><div class="drawer-tab-label">Color from Image</div><div class="drawer-tab-sub">extract palette</div></div>
       </div>
 
+      <div class="drawer-section-label" style="margin-top:4px;">Export</div>
+      <div class="drawer-tab" data-sheet-action="export">
+        <div class="drawer-tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></div>
+        <div class="drawer-tab-text"><div class="drawer-tab-label">Export Palette</div><div class="drawer-tab-sub">CSS, JSON, PNG…</div></div>
+      </div>
+
       <div class="drawer-section-label" style="margin-top:4px;">Appearance</div>
       <div class="drawer-tab" data-sheet-action="theme">
         <div class="drawer-tab-icon" id="mob-theme-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="width:15px;height:15px"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></div>
@@ -227,6 +396,13 @@ function injectBottomSheet() {
       } else if (action === 'img') {
         if (typeof window.activateTab === 'function') window.activateTab('img');
         closeSheet();
+      } else if (action === 'export') {
+        closeSheet();
+        setTimeout(() => {
+          if (typeof window.toggleExport === 'function') window.toggleExport();
+          // Inject "Copy Link" option into the export popup if not already there
+          injectCopyLinkIntoExportPopup();
+        }, 200);
       } else if (action === 'theme') {
         if (typeof window.toggleTheme === 'function') window.toggleTheme();
         syncThemeLabel();
@@ -255,6 +431,30 @@ export function closeSheet() {
   document.getElementById('mobile-sheet-backdrop')?.classList.remove('open');
 }
 window.closeMobileSheet = closeSheet;
+
+function injectCopyLinkIntoExportPopup() {
+  const popup = document.getElementById('export-popup');
+  if (!popup || popup.querySelector('[data-mob-copy-link]')) return;
+  // Find the divider and insert before it (so Copy Link sits in the Copy section)
+  const divider = popup.querySelector('.export-divider');
+  const item = document.createElement('div');
+  item.className = 'export-opt';
+  item.dataset.mobCopyLink = '1';
+  item.innerHTML = `
+    <div class="export-opt-icon"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
+    <div class="export-opt-info"><div class="export-opt-label">Copy link</div><div class="export-opt-sub">share this palette</div></div>
+  `;
+  item.addEventListener('click', () => {
+    navigator.clipboard.writeText(location.href).catch(() => {});
+    popup.classList.remove('open');
+    showMobileToast('link copied');
+  });
+  if (divider) {
+    popup.insertBefore(item, divider);
+  } else {
+    popup.appendChild(item);
+  }
+}
 
 function syncThemeLabel() {
   const isLight = document.documentElement.classList.contains('light');
@@ -310,7 +510,6 @@ function showMobileToast(msg) {
     document.body.appendChild(toast);
   }
   toast.textContent = msg;
-  // Force reflow so transition fires even on re-use
   void toast.offsetWidth;
   toast.style.opacity = '1';
   toast.style.transform = 'translateX(-50%) translateY(0)';
@@ -328,7 +527,7 @@ export function renderMobileSwatches() {
   if (!isMobile()) return;
 
   const p       = PALETTES[current];
-  const display = getDisplay(); // CVD-simulated colours for bg
+  const display = getDisplay();
   const container = document.getElementById('swatches');
   if (!container) return;
 
@@ -348,9 +547,11 @@ export function renderMobileSwatches() {
 
     row.innerHTML = `
       <div class="mob-swipe-delete-bg" data-index="${i}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
-          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-        </svg>
+        <div class="mob-delete-icon-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+          </svg>
+        </div>
       </div>
 
       <div class="mob-swipe-content" data-index="${i}">
@@ -396,6 +597,7 @@ export function renderMobileSwatches() {
 
     row.querySelector('[data-action="edit"]').addEventListener('click', e => {
       e.stopPropagation();
+      // Open editor WITHOUT auto-focusing (pass noFocus flag if supported)
       if (typeof window.openEditorAt === 'function') window.openEditorAt(i, row);
     });
 
@@ -407,6 +609,7 @@ export function renderMobileSwatches() {
     });
 
     initTouchDrag(row.querySelector('.mobile-drag-handle'), i, container);
+    initLongPressDrag(row, i, container);
     initSwipeToDelete(row, i);
     container.appendChild(row);
   });
@@ -426,15 +629,14 @@ function showCheck(i) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SWIPE-TO-DELETE  (Discord-style)
+   SWIPE-TO-DELETE  (full swatch slides; trash icon on card bg)
    ═══════════════════════════════════════════════════════════════════════════ */
 function initSwipeToDelete(row, idx) {
   const content = row.querySelector('.mob-swipe-content');
   const bg      = row.querySelector('.mob-swipe-delete-bg');
   if (!content || !bg) return;
 
-  const DELETE_THRESHOLD = 110; // px needed to trigger delete
-  const MAX_REVEAL       = 90;  // px of delete bg shown at rest before threshold
+  const DELETE_THRESHOLD = 110;
   let startX = 0, startY = 0;
   let currentX = 0;
   let isDragging = false;
@@ -459,28 +661,22 @@ function initSwipeToDelete(row, idx) {
     const dx = t.clientX - startX;
     const dy = t.clientY - startY;
 
-    // Determine gesture direction on first significant move
     if (isHorizontal === null && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
       isHorizontal = Math.abs(dx) > Math.abs(dy);
     }
 
-    if (!isHorizontal) return; // let vertical scrolling happen naturally
+    if (!isHorizontal) return;
 
-    e.preventDefault(); // prevent scroll for horizontal swipe
+    e.preventDefault();
 
-    // Only allow left swipe (negative dx)
     const rawDelta = Math.min(0, dx);
-
-    // If locked, give rubber-band resistance: can only pull slightly
     const isLocked = locks[idx] || false;
     if (isLocked) {
-      // Rubberband: sqrt dampening, max 24px reveal
       currentX = -Math.min(24, Math.sqrt(Math.abs(rawDelta)) * 2.5);
     } else {
       if (Math.abs(rawDelta) <= DELETE_THRESHOLD) {
         currentX = rawDelta;
       } else {
-        // Past threshold: slow down extra pull (rubber band)
         const extra = Math.abs(rawDelta) - DELETE_THRESHOLD;
         currentX = -(DELETE_THRESHOLD + extra * 0.18);
       }
@@ -497,10 +693,8 @@ function initSwipeToDelete(row, idx) {
     const isLocked = locks[idx] || false;
 
     if (!isLocked && Math.abs(currentX) >= DELETE_THRESHOLD) {
-      // Trigger delete: fly out then remove
       triggerDeleteAnimation(row, idx, content, bg);
     } else {
-      // Spring back
       isAnimating = true;
       content.style.transition = 'transform 0.38s cubic-bezier(0.34,1.56,0.64,1)';
       bg.style.transition      = 'opacity 0.38s cubic-bezier(0.34,1.56,0.64,1), width 0.38s cubic-bezier(0.34,1.56,0.64,1)';
@@ -524,7 +718,6 @@ function applySwipePosition(content, bg, dx, threshold, isLocked) {
   bg.style.width   = `${bgWidth}px`;
   bg.style.opacity = isLocked ? String(Math.min(0.25, progress * 0.4)) : String(Math.min(1, progress * 1.4));
 
-  // Past threshold: tint bg red
   if (!isLocked && Math.abs(dx) >= threshold) {
     bg.classList.add('mob-delete-ready');
   } else {
@@ -535,23 +728,19 @@ function applySwipePosition(content, bg, dx, threshold, isLocked) {
 function triggerDeleteAnimation(row, idx, content, bg) {
   const rowHeight = row.getBoundingClientRect().height;
 
-  // Step 1: Fly the content out to the left
   content.style.transition = 'transform 0.2s cubic-bezier(0.4,0,0.8,0.6)';
   bg.style.transition      = 'width 0.2s cubic-bezier(0.4,0,0.8,0.6)';
   content.style.transform  = `translateX(-110%)`;
   bg.style.width           = '100%';
 
   setTimeout(() => {
-    // Step 2: Pin the row to its current height so we can animate FROM it
     row.style.maxHeight  = rowHeight + 'px';
-    row.style.minHeight  = '0';          // override the 10vh floor so it can collapse
-    row.style.flex       = '0 0 auto';   // stop it participating in flex distribution
+    row.style.minHeight  = '0';
+    row.style.flex       = '0 0 auto';
     row.style.overflow   = 'hidden';
 
-    // Force a reflow so the browser registers the starting state
     void row.offsetHeight;
 
-    // Step 3: Animate to zero — siblings flex-grow to fill the gap
     row.style.transition = [
       'max-height 0.32s cubic-bezier(0.4,0,0.2,1)',
       'opacity 0.22s ease',
@@ -578,26 +767,12 @@ function triggerDeleteAnimation(row, idx, content, bg) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   PULL-TO-ADD  (spring resistance, like the desktop + button)
-
-   The zone lives as the last child of .swatches (the scrollable container),
-   so it is naturally hidden when you have few swatches — you have to scroll
-   down to see it, just like any other content below the fold.
-
-   10 swatches fill the viewport (min-height: 10vh each). Beyond 10 the
-   container scrolls. The zone is always at the bottom of the scroll content,
-   so you reach it by scrolling down.
-
-   After a successful add we scroll the container to the bottom so the zone
-   stays in view — otherwise the re-render resets scroll to top and you'd
-   have to scroll back down to add another one.
+   PULL-TO-ADD
    ═══════════════════════════════════════════════════════════════════════════ */
 function initPullToAdd(container) {
-  // Remove any old zone first (re-render case)
   const old = container.querySelector('.mob-pull-up-zone');
   if (old) old.remove();
 
-  // Build the zone inside the scroll container so it's in normal flow
   const zone = document.createElement('div');
   zone.className = 'mob-pull-up-zone';
   zone.innerHTML = `
@@ -616,20 +791,16 @@ function initPullToAdd(container) {
   const inner = zone.querySelector('.mob-pull-up-inner');
   const label = zone.querySelector('.mob-pull-up-label');
 
-  const TRIGGER_DISTANCE = 72;
-  const MAX_PULL        = 110;
+  const TRIGGER_DISTANCE = 90;   // was 72 — needs more deliberate pull
+  const MAX_PULL        = 120;
+  const DEAD_ZONE       = 18;    // first 18px of upward drag is ignored entirely
   let pullStartY  = 0;
   let isPulling   = false;
   let pullDelta   = 0;
   let triggered   = false;
   let isAnimating = false;
-  // Track whether pull gesture was initiated at the bottom
   let gestureStartedAtBottom = false;
 
-  // The swatches container IS the scrollable element.
-  // We detect "at bottom" generously: the 64px padding-bottom on .swatches
-  // is part of scrollHeight but not part of visible content, so we need
-  // a tolerance of at least that much plus some subpixel slack.
   container.addEventListener('touchstart', e => {
     if (isAnimating) return;
     gestureStartedAtBottom = false;
@@ -637,8 +808,8 @@ function initPullToAdd(container) {
     triggered = false;
     isPulling = false;
 
-    // Generous tolerance: 64px padding-bottom + 16px subpixel/rounding slack
-    const atBottom = (container.scrollTop + container.clientHeight) >= (container.scrollHeight - 80);
+    // Require being FULLY at the scroll bottom (within 4px), not just 80px away
+    const atBottom = (container.scrollTop + container.clientHeight) >= (container.scrollHeight - 4);
     if (!atBottom) return;
 
     gestureStartedAtBottom = true;
@@ -648,20 +819,22 @@ function initPullToAdd(container) {
   container.addEventListener('touchmove', e => {
     if (isAnimating || !gestureStartedAtBottom) return;
 
-    const dy = pullStartY - e.touches[0].clientY; // positive = finger moving up = pulling up
+    const rawDy = pullStartY - e.touches[0].clientY;
+    if (rawDy <= 0) return;
+
+    // Dead zone: ignore first DEAD_ZONE px so normal scroll-end bounce doesn't fire
+    const dy = Math.max(0, rawDy - DEAD_ZONE);
     if (dy <= 0) return;
 
     isPulling = true;
-    // Spring curve: sqrt so resistance increases with distance
-    pullDelta = Math.min(MAX_PULL, Math.sqrt(dy) * 8.5);
+    // Steeper resistance: divide by 1.3 before sqrt so you need more travel
+    pullDelta = Math.min(MAX_PULL, Math.sqrt(dy / 1.3) * 8.5);
 
-    // Grow the zone (it's in-flow, so it's at the bottom of scroll content)
     zone.style.height  = pullDelta + 'px';
     zone.style.opacity = String(Math.min(1, pullDelta / TRIGGER_DISTANCE));
     inner.style.transform = `scale(${0.7 + 0.3 * Math.min(1, pullDelta / TRIGGER_DISTANCE)})`;
 
-    // Push swatches up by scrolling the container down to follow the growing zone,
-    // so it's always visible regardless of how many swatches there are.
+    // Scroll to follow the expanding zone so it's always visible
     container.scrollTop = container.scrollHeight - container.clientHeight;
 
     if (pullDelta >= TRIGGER_DISTANCE && !triggered) {
@@ -686,10 +859,8 @@ function initPullToAdd(container) {
     zone.classList.remove('mob-pull-ready');
 
     if (triggered) {
-      // Check max swatches before doing anything
       const p = PALETTES[current];
       if (p.colors.length >= 15) {
-        // Show error toast and spring back — no add
         showMobileToast('max swatches reached: 15');
         zone.style.transition  = 'height 0.36s cubic-bezier(0.34,1.56,0.64,1), opacity 0.24s ease';
         inner.style.transition = 'transform 0.36s cubic-bezier(0.34,1.56,0.64,1)';
@@ -707,13 +878,11 @@ function initPullToAdd(container) {
       }
 
       isAnimating = true;
-      // Satisfying bounce on the + icon
       inner.style.transition = 'transform 0.22s cubic-bezier(0.34,1.56,0.64,1)';
       inner.style.transform  = 'scale(1.18)';
       setTimeout(() => { inner.style.transform = 'scale(0.88)'; }, 130);
 
       setTimeout(() => {
-        // Collapse zone with spring
         zone.style.transition = 'height 0.32s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease';
         zone.style.height     = '0';
         zone.style.opacity    = '0';
@@ -725,13 +894,13 @@ function initPullToAdd(container) {
           isAnimating = false;
         }, 340);
 
-        // Add color — guarded by module-level cooldown so re-renders can't double-fire
         if (!_addCooldown) {
           _addCooldown = true;
-          setTimeout(() => { _addCooldown = false; }, 800); // reset after animation settles
+          setTimeout(() => { _addCooldown = false; }, 800);
 
           if (typeof window.addColor === 'function') {
-            window.addColor();
+            // Pass a flag so the caller knows NOT to open the editor popup
+            window.addColor({ skipEditor: true });
           } else {
             const p = PALETTES[current];
             const newHex = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6,'0');
@@ -744,8 +913,7 @@ function initPullToAdd(container) {
             _render();
           }
 
-          // After the re-render (which resets DOM), scroll to bottom so the
-          // pull zone is visible again. Use a short delay to let render settle.
+          // Scroll to bottom after render so pull zone is reachable
           setTimeout(() => {
             const c = document.getElementById('swatches');
             if (c) c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' });
@@ -753,7 +921,6 @@ function initPullToAdd(container) {
         }
       }, 210);
     } else {
-      // Spring back — no add
       zone.style.transition  = 'height 0.36s cubic-bezier(0.34,1.56,0.64,1), opacity 0.24s ease';
       inner.style.transition = 'transform 0.36s cubic-bezier(0.34,1.56,0.64,1)';
       zone.style.height      = '0';
@@ -774,18 +941,25 @@ function initPullToAdd(container) {
    ═══════════════════════════════════════════════════════════════════════════ */
 function initTouchDrag(handle, srcIndex, container) {
   if (!handle) return;
+  startDragBehavior(handle, srcIndex, container, false);
+}
+
+function startDragBehavior(triggerEl, srcIndex, container, isLongPress) {
   let targetIndex = srcIndex;
   let rows = [];
+  let dragging = false;
 
-  handle.addEventListener('touchstart', e => {
-    e.preventDefault();
+  const onStart = e => {
+    e.preventDefault(); // prevent scroll while using the handle
     targetIndex = srcIndex;
     rows = Array.from(container.querySelectorAll('.swatch'));
     rows[srcIndex]?.classList.add('mobile-dragging');
-  }, { passive: false });
+    dragging = true;
+  };
 
-  handle.addEventListener('touchmove', e => {
-    e.preventDefault();
+  const onMove = e => {
+    if (!dragging) return;
+    e.preventDefault(); // critical: stop page scroll during drag
     const y = e.touches[0].clientY;
     rows.forEach((row, idx) => {
       row.classList.remove('mobile-drag-over-above', 'mobile-drag-over-below');
@@ -796,9 +970,11 @@ function initTouchDrag(handle, srcIndex, container) {
           ? 'mobile-drag-over-above' : 'mobile-drag-over-below');
       }
     });
-  }, { passive: false });
+  };
 
-  handle.addEventListener('touchend', e => {
+  const onEnd = e => {
+    if (!dragging) return;
+    dragging = false;
     e.preventDefault();
     rows.forEach(r => r.classList.remove('mobile-dragging','mobile-drag-over-above','mobile-drag-over-below'));
     if (targetIndex !== srcIndex) {
@@ -817,5 +993,79 @@ function initTouchDrag(handle, srcIndex, container) {
       updateURL();
       _render();
     }
-  }, { passive: false });
+  };
+
+  triggerEl.addEventListener('touchstart', onStart, { passive: false });
+  triggerEl.addEventListener('touchmove',  onMove,  { passive: false });
+  triggerEl.addEventListener('touchend',   onEnd,   { passive: false });
+}
+
+function initLongPressDrag(row, srcIndex, container) {
+  let longPressTimer = null;
+  let didLongPress = false;
+
+  row.addEventListener('touchstart', e => {
+    // Don't activate on icon buttons or swipe-content interactions
+    if (e.target.closest('.mobile-icon') || e.target.closest('.mob-swipe-content') === null) return;
+    didLongPress = false;
+    longPressTimer = setTimeout(() => {
+      didLongPress = true;
+      if (navigator.vibrate) navigator.vibrate([12, 30, 12]);
+      row.classList.add('mobile-long-press-lift');
+      // Hand off to drag behavior using the row itself as trigger
+      // Synthesize a touchstart on the drag system
+      const rows = Array.from(container.querySelectorAll('.swatch'));
+      let targetIndex = srcIndex;
+
+      const onMove = ev => {
+        ev.preventDefault();
+        const y = ev.touches[0].clientY;
+        rows.forEach((r, idx) => {
+          r.classList.remove('mobile-drag-over-above', 'mobile-drag-over-below');
+          const rect = r.getBoundingClientRect();
+          if (y >= rect.top && y < rect.bottom) {
+            targetIndex = idx;
+            r.classList.add(y < rect.top + rect.height / 2 ? 'mobile-drag-over-above' : 'mobile-drag-over-below');
+          }
+        });
+      };
+      const onEnd = ev => {
+        ev.preventDefault();
+        row.classList.remove('mobile-long-press-lift', 'mobile-dragging');
+        rows.forEach(r => r.classList.remove('mobile-drag-over-above', 'mobile-drag-over-below'));
+        document.removeEventListener('touchmove', onMove, { passive: false });
+        document.removeEventListener('touchend', onEnd, { passive: false });
+        if (targetIndex !== srcIndex) {
+          const p    = PALETTES[current];
+          const cols = [...p.colors];
+          const nms  = [...(p.names || [])];
+          const lks  = [...locks];
+          const [sc] = cols.splice(srcIndex, 1);
+          const [sn] = nms.splice(srcIndex, 1);
+          const [sl] = lks.splice(srcIndex, 1);
+          cols.splice(targetIndex, 0, sc);
+          nms.splice(targetIndex, 0, sn);
+          lks.splice(targetIndex, 0, sl);
+          p.colors = cols; p.names = nms;
+          setLocks(lks);
+          updateURL();
+          _render();
+        }
+      };
+      row.classList.add('mobile-dragging');
+      document.addEventListener('touchmove', onMove, { passive: false });
+      document.addEventListener('touchend', onEnd, { passive: false });
+    }, 420);
+  }, { passive: true });
+
+  row.addEventListener('touchend', () => {
+    clearTimeout(longPressTimer);
+    if (didLongPress) row.classList.remove('mobile-long-press-lift');
+    didLongPress = false;
+  }, { passive: true });
+
+  row.addEventListener('touchmove', () => {
+    // Cancel long press if finger moves before timer fires
+    clearTimeout(longPressTimer);
+  }, { passive: true });
 }

@@ -139,11 +139,14 @@ export function removeColor(e,i) {
   document.getElementById('editor-popup').classList.remove('open'); render();
 }
 
-export function addColor() {
+export function addColor(opts) {
   const p=PALETTES[current]; if(p.colors.length>=15) return;
+  const skipEditor = opts && opts.skipEditor;
   p.colors.push(p.colors[p.colors.length-1]); p.names.push('new'); locks.push(false); render();
-  const swatches=document.getElementById('swatches').querySelectorAll('.swatch');
-  if(swatches[p.colors.length-1]) openEditorAt(p.colors.length-1,swatches[p.colors.length-1]);
+  if (!skipEditor) {
+    const swatches=document.getElementById('swatches').querySelectorAll('.swatch');
+    if(swatches[p.colors.length-1]) openEditorAt(p.colors.length-1,swatches[p.colors.length-1]);
+  }
 }
 
 export function showCheck(i) { const el=document.getElementById('check-'+i); el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),1200); }

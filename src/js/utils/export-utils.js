@@ -61,6 +61,12 @@ export function exportPNG() {
   canvas.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=`palette-${p.name}.png`; a.click(); },'image/png');
 }
 
+// Expose for mobile viz action menu calls
+if (typeof window !== 'undefined') {
+  // Will be set after module loads; use dynamic reference
+  window._exportVizCard = (type) => exportVizCard(type);
+}
+
 export function exportVizCard(type) {
   const d=getDisplay(), p=PALETTES[current];
   const isLight=document.documentElement.classList.contains('light');
