@@ -34,6 +34,20 @@ export function initMobile() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   CLOSE ALL MENUS  — call before opening any panel so only one is ever open
+   ═══════════════════════════════════════════════════════════════════════════ */
+function closeAllMenus() {
+  // Tools sheet
+  closeSheet();
+  // Export popup
+  const exportPopup = document.getElementById('export-popup');
+  if (exportPopup) exportPopup.classList.remove('open');
+  // Editor popup
+  const editorPopup = document.getElementById('editor-popup');
+  if (editorPopup) editorPopup.classList.remove('open');
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    ACTION BAR
    ═══════════════════════════════════════════════════════════════════════════ */
 function injectActionBar() {
@@ -57,10 +71,12 @@ function injectActionBar() {
   document.body.appendChild(bar);
 
   document.getElementById('mob-generate').addEventListener('click', () => {
+    closeAllMenus();
     if (typeof window.randomize === 'function') window.randomize();
   });
 
   document.getElementById('mob-viz').addEventListener('click', () => {
+    closeAllMenus();
     const editSection = document.getElementById('view-edit');
     const vizSection  = document.getElementById('view-viz');
     const isViz = vizSection.classList.contains('active');
@@ -73,14 +89,24 @@ function injectActionBar() {
     }
   });
 
-  // Export button → open the export popup (which is already a full bottom sheet on mobile)
+  // Export button → close all menus first, then open export popup
   document.getElementById('mob-export').addEventListener('click', (e) => {
     e.stopPropagation();
-    if (typeof window.toggleExport === 'function') window.toggleExport();
-    injectCopyLinkIntoExportPopup();
+    const exportPopup = document.getElementById('export-popup');
+    const isOpen = exportPopup && exportPopup.classList.contains('open');
+    closeAllMenus();
+    if (!isOpen) {
+      if (typeof window.toggleExport === 'function') window.toggleExport();
+      injectCopyLinkIntoExportPopup();
+    }
   });
 
-  document.getElementById('mob-menu').addEventListener('click', openSheet);
+  document.getElementById('mob-menu').addEventListener('click', () => {
+    const sheet = document.getElementById('mobile-bottom-sheet');
+    const isOpen = sheet && sheet.classList.contains('open');
+    closeAllMenus();
+    if (!isOpen) openSheet();
+  });
 
   document.addEventListener('mobile-render-viz', () => {
     requestAnimationFrame(() => setupVizButtons());
@@ -602,6 +628,13 @@ export function renderMobileSwatches() {
     `;
 
     row.querySelector('[data-action="copy"]').addEventListener('click', e => {
+      e.stopPropagation();
+      navigator.clipboard.writeText(realHex).catch(() => {});
+      showCheck(i);
+    });
+
+    // Tapping the hex label itself also copies — tap area is scoped to the text
+    row.querySelector('.mobile-hex').addEventListener('click', e => {
       e.stopPropagation();
       navigator.clipboard.writeText(realHex).catch(() => {});
       showCheck(i);

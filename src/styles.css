@@ -445,10 +445,11 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
     border-radius: 0;
     box-shadow: none;
     width: 100%;
-    height: 100dvh;
-    height: 100vh;
-    max-height: 100dvh;
-    max-height: 100vh;
+    /* Stop at the action bar so .wrap background never shows behind it */
+    height: calc(100dvh - 64px - env(safe-area-inset-bottom, 0px));
+    height: calc(100vh  - 64px - env(safe-area-inset-bottom, 0px));
+    max-height: calc(100dvh - 64px - env(safe-area-inset-bottom, 0px));
+    max-height: calc(100vh  - 64px - env(safe-area-inset-bottom, 0px));
     overflow: hidden;
     background: var(--card);
   }
@@ -479,23 +480,38 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
   ────────────────────────────────────────────────────────────── */
   .top-bar {
     flex-shrink: 0;
-    /* height grows to absorb the safe-area-inset-top (Dynamic Island / notch).
-       The visible title area is always 52px; content is pushed down by the inset. */
-    height: calc(52px + env(safe-area-inset-top, 0px));
-    padding: env(safe-area-inset-top, 0px) 18px 0;
+    /* Element is 38px tall; ::after extends 14px below for the visual rounding.
+       Total visual height stays 52px but layout only consumes 38px. */
+    height: calc(38px + env(safe-area-inset-top, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-left: 18px;
+    padding-right: 18px;
+    padding-bottom: 0;
     margin-bottom: 0;
     display: flex;
-    align-items: flex-end;
+    flex-direction: column;
+    align-items: center;
     justify-content: center;
-    padding-bottom: 0;
-    /* Match .outer background so the area behind Dynamic Island is identical */
-    background: var(--card);
-    border-bottom: .5px solid var(--border);
+    background: transparent;
+    border-bottom: none;
     border-radius: 0 0 14px 14px;
     position: relative;
     z-index: 10;
     touch-action: none;
-    /* No position:sticky, no overflow — it just sits in the flex flow */
+    overflow: visible;
+    transition: background 0.3s, border-color 0.3s;
+  }
+  .top-bar::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    bottom: -14px;
+    background: var(--card);
+    border-bottom: .5px solid var(--border);
+    border-radius: 0 0 14px 14px;
+    z-index: 1; /* paint over swatch top edge so rounded corners mask it */
+    transition: background 0.3s, border-color 0.3s;
+    pointer-events: none;
   }
   /* Re-enable touch on interactive children */
   .top-bar * { touch-action: auto; }
@@ -507,6 +523,11 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
     align-items: center;
     justify-content: center;
     width: 100%;
+    /* Shift down to visually center within the full 52px (element 38px + 14px ::after) */
+    margin-top: 14px;
+    /* Must sit above ::after (z-index:1) */
+    position: relative;
+    z-index: 2;
   }
   .palette-name-input {
     font-size: 13px;
@@ -515,8 +536,9 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
     font-weight: 700;
     color: var(--text);
     text-align: center;
-    width: 100%;
-    max-width: 260px;
+    width: auto;
+    min-width: 60px;
+    max-width: 220px;
     background: transparent;
     border: 1px dashed transparent;
     border-radius: 6px;
@@ -539,6 +561,7 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    position: relative;
   }
   .view-section {
     flex: 1;
@@ -562,13 +585,13 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
     display: flex !important;
     flex-direction: column !important;
     flex: 1 !important;
-    /* height:0 + flex:1 = take all available space, no more */
     height: 0 !important;
     min-height: 0 !important;
-    max-height: calc(100dvh - 52px - env(safe-area-inset-top, 0px) - calc(64px + env(safe-area-inset-bottom, 0px))) !important;
+    max-height: none !important;
     gap: 0 !important;
     margin: 0 !important;
-    padding: 0 !important;
+    /* padding-top clears the 14px ::after extension so first swatch isn't under the bar */
+    padding: 14px 0 0 0 !important;
     position: relative;
     overflow-y: auto;
     overflow-x: hidden;
@@ -578,11 +601,11 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
 
   /* Each swatch stretches to fill. 1/10 floor ensures >10 swatches scroll. */
   .swatch {
-    flex: 1 1 calc((100dvh - 52px - env(safe-area-inset-top, 0px) - 64px) / 10) !important;
-    min-height: calc((100dvh - 52px - env(safe-area-inset-top, 0px) - 64px) / 10) !important;
+    flex: 1 1 calc((100dvh - 64px - env(safe-area-inset-bottom, 0px) - 38px - 14px - env(safe-area-inset-top, 0px)) / 10) !important;
+    min-height: calc((100dvh - 64px - env(safe-area-inset-bottom, 0px) - 38px - 14px - env(safe-area-inset-top, 0px)) / 10) !important;
     max-height: none !important;
     height: auto !important;
-    border-radius: 9px !important;
+    border-radius: 16px !important;
     padding: 0 !important;
     display: flex !important;
     flex-direction: row !important;
@@ -597,7 +620,7 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
   }
   /* Neutralise desktop hover expansion */
   .swatch:hover,
-  .swatch:active { flex: 1 1 calc((100dvh - 52px - env(safe-area-inset-top, 0px) - 64px) / 10) !important; border-radius: 9px !important; }
+  .swatch:active { flex: 1 1 calc((100dvh - 64px - env(safe-area-inset-bottom, 0px) - 38px - 14px - env(safe-area-inset-top, 0px)) / 10) !important; border-radius: 16px !important; }
 
   /* drag states */
   .swatch.mobile-dragging { opacity: 0.4; }
@@ -633,6 +656,20 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
     letter-spacing: .07em;
     font-family: var(--mono);
     line-height: 1;
+    /* Shrink tap area to text only — same dashed-outline treatment as palette title */
+    display: inline-block;
+    align-self: flex-start;
+    border: 1px dashed transparent;
+    border-radius: 4px;
+    padding: 3px 5px;
+    margin: -3px -5px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mobile-hex:active {
+    border-color: rgba(255,255,255,0.45);
+    background: rgba(0,0,0,0.12);
   }
   .mobile-name {
     font-size: 9px;
@@ -650,16 +687,25 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
     text-transform: uppercase;
     font-family: var(--mono);
     background: transparent;
-    border: none;
+    border: 1px dashed transparent;
+    border-radius: 3px;
     outline: none;
-    padding: 0;
-    width: 100%;
+    padding: 2px 4px;
+    margin: -2px -4px;
+    width: auto;
+    max-width: 100%;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     cursor: text;
+    color: inherit;
+    transition: border-color 0.15s, background 0.15s;
     -webkit-appearance: none;
     touch-action: auto;
+  }
+  .mobile-name-input:focus {
+    border-color: var(--accent);
+    background: rgba(0,0,0,0.15);
   }
   .mobile-name-input::placeholder { opacity: 0.35; }
 
@@ -727,14 +773,15 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
   /* ── editor → bottom sheet ──────────────────────────────── */
   .editor-popup {
     position: fixed !important;
-    bottom: 0 !important;
+    /* Sit above the action bar so its content is never clipped behind it */
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
     left: 0 !important;
     right: 0 !important;
     top: auto !important;
     width: 100% !important;
     border-radius: 20px 20px 0 0;
-    border-bottom: none;
-    padding: 8px 20px 36px;
+    border: .5px solid var(--border2);
+    padding: 8px 20px 20px;
     z-index: 400;
     transform: translateY(110%);
     transition: transform 0.3s cubic-bezier(.4,0,.2,1);
@@ -755,14 +802,15 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
   /* ── export popup → bottom sheet ───────────────────────── */
   .export-popup {
     position: fixed !important;
-    bottom: 0 !important;
+    /* Sit above the action bar so its content is never clipped behind it */
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
     left: 0 !important;
     right: 0 !important;
     top: auto !important;
     width: 100% !important;
     border-radius: 20px 20px 0 0;
-    border-bottom: none;
-    padding: 8px 8px 36px;
+    border: .5px solid var(--border2);
+    padding: 8px 8px 16px;
     z-index: 400;
     transform: translateY(110%);
     transition: transform 0.3s cubic-bezier(.4,0,.2,1);
@@ -855,11 +903,15 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
   /* ── BOTTOM SHEET — settings ────────────────────────────── */
   .mobile-sheet-backdrop {
     position: fixed;
-    inset: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    /* Full height — sits behind the toolbar so toolbar stays visible */
+    bottom: 0;
     background: rgba(0,0,0,0.55);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
-    z-index: 350;
+    z-index: 280;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.25s;
@@ -871,18 +923,21 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
   }
   .mobile-bottom-sheet {
     position: fixed;
+    /* bottom:0 so it slides from behind the toolbar (z-index < toolbar) */
     bottom: 0;
     left: 0;
     right: 0;
     background: var(--drawer);
     border: .5px solid var(--border2);
-    border-bottom: none;
     border-radius: 24px 24px 0 0;
-    z-index: 360;
+    /* Below the action bar (300) so it animates from behind it */
+    z-index: 290;
     transform: translateY(100%);
     transition: transform 0.35s cubic-bezier(.4,0,.2,1);
-    max-height: 88dvh;
-    max-height: 88vh;
+    max-height: calc(88dvh - env(safe-area-inset-bottom, 0px));
+    max-height: calc(88vh - env(safe-area-inset-bottom, 0px));
+    /* Pad bottom content so it clears the action bar */
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     display: block !important;
@@ -904,7 +959,7 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
     padding: 10px 20px 6px;
     font-weight: 600;
   }
-  .mobile-bottom-sheet .drawer-body { padding: 4px 0 88px; }
+  .mobile-bottom-sheet .drawer-body { padding: 4px 0 16px; }
   .mobile-bottom-sheet .drawer-section-label { padding: 12px 20px 4px; }
   .mobile-bottom-sheet .drawer-tab { margin: 2px 12px; }
   .mobile-info-section {
