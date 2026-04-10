@@ -598,7 +598,8 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
     /* padding-top clears the 14px ::after extension so first swatch isn't under the bar */
     padding: 14px 0 env(safe-area-inset-bottom, 0px) 0 !important;
     scroll-padding-bottom: env(safe-area-inset-bottom, 0px);
-    padding: 14px 0 calc(env(safe-area-inset-bottom, 0px) + 42px) 0 !important;
+    /* padding: 14px 0 calc(env(safe-area-inset-bottom, 0px) + 2px) 0 !important; */
+    padding: 14px 0 calc(env(safe-area-inset-bottom, 0px) + 100vh - 100dvh) 0 !important;
     position: relative;
     overflow-y: auto;
     overflow-x: hidden;
