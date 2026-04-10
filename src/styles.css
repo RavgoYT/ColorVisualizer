@@ -417,6 +417,11 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
 .mob-pull-up-zone.mob-pull-ready .mob-pull-up-label { color: var(--accent); }
 
 @media (max-width: 768px) {
+  body { background: var(--card) !important; }
+  .page { background: var(--card) !important; }
+  .outer { background: var(--card) !important; }
+  .wrap { background: var(--card) !important; }
+  .top-bar::after { background: var(--card) !important; }
 
   /* ── prevent pull-to-refresh and double-tap zoom ──────────── */
   html { overscroll-behavior-y: none; }
@@ -591,7 +596,9 @@ body{background:var(--bg);transition:background .3s; font-family:var(--mono);}
     gap: 0 !important;
     margin: 0 !important;
     /* padding-top clears the 14px ::after extension so first swatch isn't under the bar */
-    padding: 14px 0 0 0 !important;
+    padding: 14px 0 env(safe-area-inset-bottom, 0px) 0 !important;
+    scroll-padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding: 14px 0 calc(env(safe-area-inset-bottom, 0px) + 42px) 0 !important;
     position: relative;
     overflow-y: auto;
     overflow-x: hidden;

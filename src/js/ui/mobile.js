@@ -497,7 +497,7 @@ function syncThemeLabel() {
   const icon  = document.getElementById('mob-theme-icon');
   // Keep browser chrome (status bar / Dynamic Island area) in sync with card bg
   const meta = document.getElementById('theme-color-meta');
-  if (meta) meta.setAttribute('content', isLight ? '#ffffff' : '#0e0e16');
+  if (meta) meta.setAttribute('content', isLight ? '#f0f0f5' : '#06060a');
   if (label) label.textContent = isLight ? 'Light mode' : 'Dark mode';
   if (icon) {
     icon.innerHTML = isLight
